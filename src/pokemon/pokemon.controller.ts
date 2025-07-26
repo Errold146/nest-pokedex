@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ValidationPipe, Query } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PokemonService } from './pokemon.service';
 import { CreatePokemonDto } from './dto/create-pokemon.dto';
 import { UpdatePokemonDto } from './dto/update-pokemon.dto';
@@ -7,7 +8,10 @@ import { ParseMongoIdPipe } from 'src/common/pipes/parse-mongo-id.pipe';
 
 @Controller('pokemon')
 export class PokemonController {
-    constructor(private readonly pokemonService: PokemonService) {}
+    constructor(
+        private readonly pokemonService: PokemonService,
+        private readonly configService: ConfigService
+    ){}
 
     @Post()
     create(@Body() createPokemonDto: CreatePokemonDto) {
@@ -16,8 +20,8 @@ export class PokemonController {
 
     @Get()
     findAll(@Query() paginationDto: PaginationDto) {
-        const { page = 0, limit = 10 } = paginationDto;
-        const offset = page * limit;
+        const limit = paginationDto.getLimit(this.configService)
+        const offset = paginationDto.getOffset(this.configService);
         return this.pokemonService.findAll(limit, offset);
     }
 

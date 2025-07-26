@@ -3,8 +3,9 @@ import {
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
-import { isValidObjectId, Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
+import { isValidObjectId, Model } from 'mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Pokemon } from './entities/pokemon.entity';
 import { CreatePokemonDto } from './dto/create-pokemon.dto';
 import { UpdatePokemonDto } from './dto/update-pokemon.dto';
@@ -16,6 +17,7 @@ export class PokemonService {
     constructor(
         @InjectModel(Pokemon.name)
         private readonly pokemonModel: Model<Pokemon>,
+        private readonly configService: ConfigService
 
         //? Listo para usar en caso que hacer una petición http a una api externa
         //? private readonly http: AxiosAdapter
@@ -36,25 +38,26 @@ export class PokemonService {
     }
 
     // Obtener todos con paginación opcional
-    async findAll(limit?: number, offset?: number): Promise<
-        { id: string; no: number; name: string; imageUrl?: string; pokeUrl?: string }[]
-    > {
-        const query = this.pokemonModel
+    async findAll(limit?: number, offset?: number) {
+        const defaultLimit = this.configService.get<number>('defaultLimit') ?? 20;
+
+        const safeLimit = limit && limit > 0 ? limit : defaultLimit;
+        const safeOffset = offset && offset >= 0 ? offset : 0;
+
+        const pokemons = await this.pokemonModel
             .find({}, { _id: 1, no: 1, name: 1, imageUrl: 1, pokeUrl: 1 })
             .sort({ no: 1 })
-            .lean();
+            .skip(safeOffset)
+            .limit(safeLimit)
+            .lean()
+            .exec();
 
-        if (typeof offset === 'number' && !isNaN(offset)) query.skip(offset);
-        if (typeof limit === 'number' && !isNaN(limit)) query.limit(limit);
-
-        const pokemons = await query;
-
-        return pokemons.map(p => ({
-            id: p._id.toString(),
-            no: p.no,
-            name: p.name,
-            imageUrl: p.imageUrl,
-            pokeUrl: p.pokeUrl,
+        return pokemons.map(({ _id, no, name, imageUrl, pokeUrl }) => ({
+            id: _id.toString(),
+            no,
+            name,
+            imageUrl,
+            pokeUrl,
         }));
     }
 
